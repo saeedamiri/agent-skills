@@ -34,6 +34,10 @@ vars in thousands of tokens, e.g. CONTEXT_CAP_CODER=250:
 SessionStart with source "compact" (router launcher only): after an automatic or
 manual compaction, tell the router to re-read its state file and reconcile from
 git before acting on the summary.
+
+Diagnostics: set CONTEXT_CAP_TRACE=<file> to append each call's event, tool, agent
+and transcript path to that file (verified this way on Codex CLI 0.160: subagent
+tool calls carry the subagent's own session file).
 """
 
 from __future__ import annotations
@@ -205,6 +209,11 @@ def pre_tool(data: dict) -> int:
 def main() -> int:
     try:
         data = json.load(sys.stdin)
+        trace = os.environ.get("CONTEXT_CAP_TRACE")
+        if trace:  # diagnostics only: which events reach the hook, and with which fields
+            with open(trace, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({k: data.get(k) for k in ("hook_event_name", "tool_name", "agent_id",
+                                                               "agent_type", "transcript_path")}) + "\n")
         if data.get("hook_event_name") == "PreToolUse":
             return pre_tool(data)
         if data.get("hook_event_name") == "SessionStart":
