@@ -67,6 +67,13 @@ def free_gb() -> float:
         for line in meminfo.read_text().splitlines():
             if line.startswith("MemAvailable:"):
                 return int(line.split()[1]) / 2**20
+    if sys.platform == "darwin":  # free + inactive + speculative pages are reclaimable without swapping
+        import re
+        import subprocess
+        out = subprocess.run(["vm_stat"], capture_output=True, text=True).stdout
+        page = int(re.search(r"page size of (\d+)", out).group(1))
+        pages = {k: int(v) for k, v in re.findall(r"Pages (free|inactive|speculative):\s+(\d+)", out)}
+        return sum(pages.values()) * page / 2**30
     try:
         import psutil  # type: ignore
         return psutil.virtual_memory().available / 2**30

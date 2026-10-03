@@ -16,7 +16,7 @@ these.
 | `adapters/codex/` | Worker roles as agent TOML files and `hooks.json`. |
 | `adapters/instructions.snippet.md` | The lines to add to a harness's global instructions file. |
 | `install.py` | Links the skills into each harness and installs the adapters without overwriting anything. |
-| `bin/router`, `bin/router.ps1` | Start a router session with its own compaction window and notes. |
+| `bin/router`, `router.cmd`, `router.ps1` | The `router` command: a router session with its own compaction point and notes. |
 
 Skills use the open `SKILL.md` format (`name` and `description` frontmatter,
 Markdown body), so any tool that reads skills can use them as they are.
@@ -35,28 +35,38 @@ Change a model here, not in the skills.
 
 ## Install
 
+Windows, macOS or Linux (any distribution), Python 3.9 or newer:
+
 ```bash
-python install.py check
-python install.py claude            # ~/.claude/skills, ~/.claude/agents; prints the settings to merge
-python install.py codex             # ~/.agents/skills, ~/.codex/agents, ~/.codex/hooks.json
+git clone https://github.com/saeedamiri/agent-skills ~/agent-skills
+python ~/agent-skills/install.py        # python3 where python is not Python 3
+```
+
+The installer detects the OS and which of Claude Code and Codex are installed,
+then for each one links the skills, installs the worker roles, merges the
+context-cap hook into its settings (with a backup beside the file), adds the
+cycle instructions to its global instructions file, and puts `bin/` on your
+PATH so `router` works in a new terminal (Windows: user PATH; macOS and Linux:
+your bash, zsh or fish profile). Running it again changes nothing.
+
+```bash
+python install.py check             # what is installed where
+python install.py claude | codex    # one tool only
 python install.py skills-dir <DIR>  # any other tool that reads <DIR>/<name>/SKILL.md
 ```
 
 Skills are linked (a directory junction on Windows, a symlink elsewhere), so an
-edit here reaches every harness at once. Then add
-`adapters/instructions.snippet.md` to the harness's global instructions file
-(`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, or your tool's equivalent).
-
-Codex runs a hook only after you trust it: run `/hooks` in Codex once, and
-again after editing the hook.
+edit here reaches every tool at once. Codex runs a hook only after you trust
+it: run `/hooks` in Codex once, and again after editing the hook.
 
 ## Router sessions compact on their own (Claude Code)
 
-Start a router with `bin/router` (PowerShell: `bin/router.ps1`) instead of
-`claude`; arguments pass through (`router --continue`). For that session only:
+Type `router` instead of `claude` when you start or resume a router; arguments
+pass through (`router --resume <id>`, `router --continue`). Everything else
+stays `claude`. For a router session only:
 
-- the compaction window is 235k, so it compacts at about 202k (window minus 33k) instead of near
-  the model's full window;
+- it compacts at about 202k (a 235k window minus 33k) instead of near the
+  model's full window;
 - at 185k the hook tells the router to bring its state file up to date and
   commit it;
 - right after any compaction the hook tells it to re-read the state file and
@@ -64,8 +74,9 @@ Start a router with `bin/router` (PowerShell: `bin/router.ps1`) instead of
 
 Other sessions, such as research, keep the default window and get no notes.
 Subagents of a router session share its window, so they compact at the same
-point; their caps remain the backstop elsewhere. For a router already running,
-type `/autocompact 235k` in it; it then compacts early, without the two notes.
+point; their caps remain the backstop elsewhere. A router resumed with plain
+`claude` loses all three; for one already running, `/autocompact 235k` restores
+the early compaction, without the notes.
 
 ## What each harness gets
 

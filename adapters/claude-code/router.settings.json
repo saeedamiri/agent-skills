@@ -3,7 +3,7 @@
   "env": { "AGENT_ROLE": "router", "CONTEXT_CAP_MAIN": "185" },
   "hooks": {
     "SessionStart": [
-      { "matcher": "compact", "hooks": [ { "type": "command", "command": "python \"{HOOK}\"", "timeout": 10 } ] }
+      { "matcher": "compact", "hooks": [ { "type": "command", "command": "\"{PYTHON}\" \"{HOOK}\"", "timeout": 10 } ] }
     ]
   }
 }
