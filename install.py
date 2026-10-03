@@ -1,7 +1,8 @@
 """Install the cycle skills, worker roles and context-cap hook for one or more harnesses.
 
     python install.py check                 # what is installed where
-    python install.py claude                # ~/.claude: skills, agent types, hook (settings printed, not edited)
+    python install.py claude                # ~/.claude: skills, agent types, hook (settings printed, not edited),
+                                            # and the router-only settings bin/router passes to claude
     python install.py codex                 # ~/.agents/skills, ~/.codex/agents, ~/.codex/hooks.json
     python install.py skills-dir <DIR>      # any other tool that reads <DIR>/<name>/SKILL.md
 
@@ -83,6 +84,10 @@ def claude() -> None:
     else:
         print(f"  TODO merge into {settings}:")
         print((ROOT / "adapters" / "claude-code" / "settings.snippet.json").read_text(encoding="utf-8").replace("{HOOK}", HOOK))
+    router = ROOT / "adapters" / "claude-code" / "router.settings.local.json"
+    router.write_text((ROOT / "adapters" / "claude-code" / "router.settings.json").read_text(encoding="utf-8")
+                      .replace("{HOOK}", HOOK), encoding="utf-8")
+    print(f"  wrote {router}  (start routers with bin/router; other sessions are unaffected)")
     print("  TODO once: add adapters/instructions.snippet.md to ~/.claude/CLAUDE.md if it is not there")
 
 

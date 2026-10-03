@@ -66,9 +66,17 @@ Rules:
 You are the most expensive agent per turn: every wake-up re-sends everything
 you hold. So:
 
-- **Restart yourself between phases** (after a wave closes, after a flush,
-  above about 120k tokens): commit your one-page state, and let a fresh router
-  pick up from git.
+- **Keep the state file current as you go**, not only at the end: update and
+  commit it after every dispatch, handoff and decision, so a compaction or a
+  crash at any moment loses nothing that matters.
+- **Compaction is automatic where the harness supports it.** A router started
+  through the adapter's router launcher compacts at a lower window than other
+  sessions; you are told shortly before it to bring the state file up to date,
+  and right after it to re-read the state file and reconcile from git before
+  acting on the summary. Do not ask the owner to compact you.
+- **Without that, restart yourself between phases** (after a wave closes, after
+  a flush, above about 120k tokens): commit your one-page state, and let a
+  fresh router pick up from git.
 - Take worker reports as short as possible: ask workers to report in under 200
   words, with detail in their commits.
 - Push reading into fresh subagents (light tier for inventories and log
@@ -218,6 +226,9 @@ send "please stop" messages; you act on the stop when it arrives as a completion
 worker stops at its cap, dispatch a fresh one on the same branch pointed at the
 transfer note. When a worker hands back above about 150k, do not reuse it for
 the next round; start fresh. Verifiers are fresh every round.
+Where workers share the session's compaction window (a router launched with a
+lower window), they compact at that window before reaching their caps; the caps
+then act as the backstop for longer windows.
 
 Why these numbers: a fresh worker costs its setup (reading the brief, skills
 and code) once; a large worker costs its whole context every turn. Past about

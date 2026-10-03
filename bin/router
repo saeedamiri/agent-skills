@@ -1,0 +1,7 @@
+#!/bin/sh
+# Start a router session: 200k compaction window, a save-state note before it, and a
+# re-orientation note after it. Arguments pass through, e.g. `router --continue`.
+here="$(cd "$(dirname "$0")/.." && pwd)"
+settings="$here/adapters/claude-code/router.settings.local.json"
+[ -f "$settings" ] || python "$here/install.py" claude >/dev/null
+exec claude --settings "$settings" --autocompact 200k "$@"

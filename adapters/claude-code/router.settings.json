@@ -1,0 +1,9 @@
+{
+  "autoCompactWindow": 200000,
+  "env": { "AGENT_ROLE": "router", "CONTEXT_CAP_MAIN": "145" },
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "compact", "hooks": [ { "type": "command", "command": "python \"{HOOK}\"", "timeout": 10 } ] }
+    ]
+  }
+}

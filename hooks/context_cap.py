@@ -27,7 +27,13 @@ vars in thousands of tokens, e.g. CONTEXT_CAP_CODER=250:
   verifier*  200k  verifier: commit what you have as Handoff: verify, stop
   worker-*   100k  light helper: report and stop (a bare "worker" is a general role)
   (other subagent) 200k
-  main session     180k  router-style: commit one-page state, restart at a phase boundary
+  main session     notes only when AGENT_ROLE=router (set by the router launcher settings),
+                   at CONTEXT_CAP_MAIN (default 180k); never blocked. Other main sessions,
+                   such as research, get nothing.
+
+SessionStart with source "compact" (router launcher only): after an automatic or
+manual compaction, tell the router to re-read its state file and reconcile from
+git before acting on the summary.
 """
 
 from __future__ import annotations
@@ -59,10 +65,19 @@ MESSAGES = {
     "worker": "Context check: your context is {k}k tokens, over the {cap}k cap for a light helper. Report what you have and stop.",
     "other": ("Context check: your context is {k}k tokens, over the {cap}k cap. Wrap up: return your conclusions "
               "now, briefly, rather than continuing to read."),
-    "main": ("Context check: this session's context is {k}k tokens (cap {cap}k). If you are coordinating a cycle, "
-             "commit your one-page state at the next phase boundary and let a fresh session continue from git. "
-             "Otherwise consider /compact at a natural break."),
+    "main": ("Context check: this router session is at {k}k tokens and will be compacted automatically soon. "
+             "Now, before your next dispatch, bring your one-page state file up to date and commit it: what is in "
+             "flight (package, branch, worktree, worker tier, round), what you are waiting for, decisions made "
+             "since the last commit, and the next step. Anything not in that file or in git may be lost."),
 }
+AFTER_COMPACT = ("This router session was just compacted. The summary above is not your source of truth: re-read your "
+                 "one-page state file and the router skill, reconcile from git (worktrees, marker and handoff commits, "
+                 "open PRs) as the skill describes, and only then continue. Do not re-dispatch work that git shows is "
+                 "already in flight.")
+
+
+def is_router() -> bool:
+    return os.environ.get("AGENT_ROLE", "").lower() == "router"
 
 
 def latest_context_tokens(path: Path) -> int | None:
@@ -192,6 +207,11 @@ def main() -> int:
         data = json.load(sys.stdin)
         if data.get("hook_event_name") == "PreToolUse":
             return pre_tool(data)
+        if data.get("hook_event_name") == "SessionStart":
+            if data.get("source") == "compact" and is_router() and not data.get("agent_type"):
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart",
+                                                         "additionalContext": AFTER_COMPACT}}))
+            return 0
         path = transcript_for(data)
         if path is None:
             return 0
@@ -199,6 +219,8 @@ def main() -> int:
         if who is None:
             return 0
         kind, cap = classify(who[1], who[0])
+        if kind == "main" and not is_router():
+            return 0  # research and other interactive sessions are left alone
         tokens = latest_context_tokens(path)
         if tokens is None:
             return 0

@@ -16,6 +16,7 @@ these.
 | `adapters/codex/` | Worker roles as agent TOML files and `hooks.json`. |
 | `adapters/instructions.snippet.md` | The lines to add to a harness's global instructions file. |
 | `install.py` | Links the skills into each harness and installs the adapters without overwriting anything. |
+| `bin/router`, `bin/router.ps1` | Start a router session with its own compaction window and notes. |
 
 Skills use the open `SKILL.md` format (`name` and `description` frontmatter,
 Markdown body), so any tool that reads skills can use them as they are.
@@ -48,6 +49,23 @@ edit here reaches every harness at once. Then add
 
 Codex runs a hook only after you trust it: run `/hooks` in Codex once, and
 again after editing the hook.
+
+## Router sessions compact on their own (Claude Code)
+
+Start a router with `bin/router` (PowerShell: `bin/router.ps1`) instead of
+`claude`; arguments pass through (`router --continue`). For that session only:
+
+- the compaction window is 200k, so it compacts at roughly 165k instead of near
+  the model's full window;
+- at 145k the hook tells the router to bring its state file up to date and
+  commit it;
+- right after any compaction the hook tells it to re-read the state file and
+  reconcile from git before trusting the summary.
+
+Other sessions, such as research, keep the default window and get no notes.
+Subagents of a router session share its window, so they compact at the same
+point; their caps remain the backstop elsewhere. For a router already running,
+type `/autocompact 200k` in it; it then compacts early, without the two notes.
 
 ## What each harness gets
 
