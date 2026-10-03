@@ -4,4 +4,4 @@
 here="$(cd "$(dirname "$0")/.." && pwd)"
 settings="$here/adapters/claude-code/router.settings.local.json"
 [ -f "$settings" ] || python "$here/install.py" claude >/dev/null
-exec claude --settings "$settings" --autocompact 200k "$@"
+exec claude --settings "$settings" --autocompact 235k "$@"

@@ -55,9 +55,9 @@ again after editing the hook.
 Start a router with `bin/router` (PowerShell: `bin/router.ps1`) instead of
 `claude`; arguments pass through (`router --continue`). For that session only:
 
-- the compaction window is 200k, so it compacts at roughly 165k instead of near
+- the compaction window is 235k, so it compacts at about 202k (window minus 33k) instead of near
   the model's full window;
-- at 145k the hook tells the router to bring its state file up to date and
+- at 185k the hook tells the router to bring its state file up to date and
   commit it;
 - right after any compaction the hook tells it to re-read the state file and
   reconcile from git before trusting the summary.
@@ -65,7 +65,7 @@ Start a router with `bin/router` (PowerShell: `bin/router.ps1`) instead of
 Other sessions, such as research, keep the default window and get no notes.
 Subagents of a router session share its window, so they compact at the same
 point; their caps remain the backstop elsewhere. For a router already running,
-type `/autocompact 200k` in it; it then compacts early, without the two notes.
+type `/autocompact 235k` in it; it then compacts early, without the two notes.
 
 ## What each harness gets
 
