@@ -96,3 +96,7 @@ says whether the thread is a spawned subagent and its role, and whose
 Without a hook, a worker cannot see its own context size, so the coder and
 verifier skills give it a proxy: commit after every coherent step, and treat
 about 40 tool calls in a round as the cap.
+
+## Licence
+
+MIT, copyright (c) 2026 Saeed Amiri; see `LICENSE`. Use, change and share it freely; keep the copyright notice in copies.
