@@ -16,8 +16,7 @@ personal addresses.
   "worktreeRoot": "<directory package worktrees are created under>",
   "push": "ask | standing",
   "notify": "none | <configured channel>",
-  "batch": 1,
-  "batchMaxAgeHours": 12 }
+  "batch": 1 }
 ```
 
 - `dispatch` is the owner's choice of channel; never pick or change it.
@@ -27,7 +26,6 @@ personal addresses.
   flush or wave PR on a green local full suite. It never authorizes a merge
   onto the main branch.
 - `batch` is never asked for or written by a router; absent means `1`.
-- `batchMaxAgeHours` is read only when `batch` is above `1`.
 - Two routers never share a settings file.
 
 ## Marker commits
@@ -70,7 +68,6 @@ Router-Batch-Lane: <lane>
 Router-Batch-Baseline: <baseline sha>
 Router-Batch-Baseline-Run: <run id that proved the baseline green>
 Router-Batch-Limit: <batch>
-Router-Batch-Max-Age-Hours: <batchMaxAgeHours>
 ```
 
 A member checkpoint is a merge:
@@ -91,7 +88,7 @@ every checkpoint.
 
 ```bash
 git ls-remote --heads origin 'router/batch-*'                        # open batches
-git log --format='%H %cI %B' --grep='^Router: batch opened$' <batch>  # age, baseline
+git log --format='%H %cI %B' --grep='^Router: batch opened$' <batch>  # baseline
 git log --format=%B <batch> | grep -c '^Router-Batch-Member:'         # count vs batch
 gh pr list --state open --json number,headRefName                     # frozen by a PR?
 ```

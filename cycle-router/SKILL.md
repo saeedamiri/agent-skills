@@ -44,7 +44,7 @@ conversation, so derive state rather than remember it:
 - **in flight**: `git worktree list`; the branch name carries the package;
 - **which round**: count `Handoff:` trailers on the branch;
 - **parked**: the newest `Router:` marker commit on the branch;
-- **batch membership and age**: the batch's opening marker and its member lines.
+- **batch membership**: the batch's opening marker and its member lines.
 
 Rules:
 
@@ -286,7 +286,7 @@ is declared per package (`batchable`, `member-ci`, `forced-solo`); absent means
 never override it. Two open batches for one lane, or no unique opening marker:
 stop and report. Change the batch setting between cycles, never during one. CI config, deployment config, Dockerfiles, dependency manifests,
 schema migrations, auth changes and shared data contracts are always
-forced-solo. Flush when the member limit or age limit is reached, the queue for
+forced-solo. Flush when the member limit is reached, the queue for
 the lane is empty, the main branch moved, the next package is forced-solo, or
 the owner asks. A flush is: freeze membership, handoff checks, fast-lane batch
 review (standard tier), one local full suite under a heavy slot, then one PR.
