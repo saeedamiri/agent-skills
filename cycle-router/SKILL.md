@@ -133,14 +133,18 @@ the worker's scope and tells the owner which runs need the stronger model.
 
 | Role | Tier | Send it |
 | --- | --- | --- |
-| `coder-strong` | strong | full-lane builds that need judgement: evidence, ML or data-contract changes, cross-layer behaviour, unclear root cause, security or legal surfaces, a package that failed a round on the standard tier |
-| `coder-standard` | standard | well-specified work: every fast-lane change, test or fixture repairs, merge-conflict resolution, a CI fix whose cause is already diagnosed, copy and styling, docs and skills, mechanical refactors, a remediation round whose findings are concrete and local |
+| `coder-strong` | strong | builds where a wrong call is expensive: evidence, ML or data-contract changes, security or legal surfaces, a root cause nobody has diagnosed yet, a package that failed a round on the standard tier |
+| `coder-standard` | standard | **the default builder**: most full-lane product work with a clear brief (UI, copy, layout, reports, owner-review rounds, server routes, cross-layer changes with a known design), every fast-lane change, test or fixture repairs, merge-conflict resolution, a CI fix whose cause is already diagnosed, docs and skills, mechanical refactors, remediation rounds with concrete findings, stack rebuilds and sample runs |
 | `verifier-strong` | strong | every full-lane verification |
 | `verifier-standard` | standard | the fast-lane batch review at a flush; prose-only or tooling-only reviews |
 | `worker-light` | light | no judgement: run a named command and report failing lines, downloads, log extraction, file inventories, cleanup of resources named explicitly |
 
 Rules:
 
+- **Standard is the default, not a fallback.** The owner's experience is that
+  the standard tier (Sonnet 5.5 at high effort in the Claude Code adapter) is
+  strong enough for most builds; choose the strong tier only for the cases its
+  row names, not for size or for being user-visible.
 - **When unsure, standard first, and escalate on failure.** A standard-tier
   builder whose round is rejected for a reason of depth (wrong root cause,
   missed interaction) is replaced by a strong-tier builder for the next round,
