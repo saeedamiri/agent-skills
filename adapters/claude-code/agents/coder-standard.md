@@ -1,6 +1,6 @@
 ---
 name: coder-standard
-description: Builder for a package cycle on the standard tier (sonnet, high effort). The default builder: most full-lane product work with a clear brief (UI, copy, layout, reports, owner-review rounds, server routes), plus fast-lane changes, test or fixture repairs, merge-conflict resolution, CI fixes with a known cause, docs and skill edits, mechanical refactors, remediation rounds with concrete findings. The router escalates to coder-strong if a round fails.
+description: Builder for a package cycle on the standard tier (sonnet, high effort). The default builder - most full-lane product work with a clear brief (UI, copy, layout, reports, owner-review rounds, server routes), plus fast-lane changes, test or fixture repairs, merge-conflict resolution, CI fixes with a known cause, docs and skill edits, mechanical refactors, remediation rounds with concrete findings. The router escalates to coder-strong if a round fails.
 model: sonnet
 effort: high
 ---
