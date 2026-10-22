@@ -30,7 +30,7 @@ Markdown body), so any tool that reads skills can use them as they are.
 | `worker-light` | light | haiku | gpt-6-luna, low |
 | `trial-sonnet` | trial | sonnet, high | - |
 | `research-fable`, `research-opus`, `research-sonnet` | research | fable / opus / sonnet, high | - |
-| `research-astra`, `research-sol` | research | - | gpt-6-astra / gpt-6.1-sol, high |
+| `research-astra`, `research-sol` | research | - | gpt-6-astra / gpt-6.1-sol, ultra |
 
 The router picks the tier per dispatch, standard first, and escalates to strong
 when a round fails for lack of depth. Full-lane verification is always strong.
