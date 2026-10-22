@@ -8,7 +8,7 @@ whose token_count events carry the context size).
 PostToolUse (soft): tell the agent once, then every further 40k, that it is over
 its cap and must commit a transfer note at the next safe point.
 
-PreToolUse (hard): past HARD_FACTOR x cap, refuse every tool call except git
+PreToolUse (hard): past HARD_FACTOR x cap (per kind in HARD_FACTORS), refuse every tool call except git
 inspection and commits (status, diff, log, show, add, commit, worktree list), so
 the agent cannot keep working but can still save what it has. Applies to
 subagents only; the main session (the person's own console or a router) is
@@ -26,6 +26,10 @@ vars in thousands of tokens, e.g. CONTEXT_CAP_CODER=250:
   coder*     250k  builder: commit + transfer note, stop
   verifier*  200k  verifier: commit what you have as Handoff: verify, stop
   worker-*   100k  light helper: report and stop (a bare "worker" is a general role)
+  trial-*    400k  long solo trial run: update and commit NOTES.md for a successor, stop;
+                   hard limit 450k (HARD_FACTORS)
+  research-* 400k  long research run: update and commit the notes file for a successor, stop;
+                   hard limit 450k
   (other subagent) 200k
   main session     notes only when AGENT_ROLE=router (set by the router launcher settings),
                    at CONTEXT_CAP_MAIN (default 180k); never blocked. Other main sessions,
@@ -48,11 +52,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-CAPS = {"coder": 250, "verifier": 200, "worker": 100}
+CAPS = {"coder": 250, "verifier": 200, "worker": 100, "trial": 400, "research": 400}
 OTHER_SUBAGENT = 200
 MAIN = 180
 REMIND_STEP = 40  # thousand tokens between reminders
 HARD_FACTOR = 1.2
+HARD_FACTORS = {"trial": 1.125, "research": 1.125}  # 400k cap -> 450k hard limit
 ALLOWED_GIT = ("status", "diff", "log", "show", "add", "commit", "worktree list", "rev-parse", "branch --show-current")
 HARD_MESSAGE = ("Hard context limit: your context is {k}k tokens, past the hard limit of {hard}k ({cap}k cap). Further "
                 "work is refused. Only git status/diff/log/show/add/commit are allowed. Commit what you have now (WIP is "
@@ -66,6 +71,14 @@ MESSAGES = {
               "turns from finishing the whole task, finish first."),
     "verifier": ("Context check: your context is {k}k tokens, over the {cap}k verifier cap. Finish the check you are "
                  "on, commit what you have as `Handoff: verify` stating what is still unresolved, then stop and report."),
+    "trial": ("Context check: your context is {k}k tokens, over the {cap}k cap for a trial run. At the next safe "
+              "point bring NOTES.md up to date so a fresh successor can continue: what works, results so far, "
+              "what you were midway through, what you tried that failed, the next steps. Commit it with your "
+              "code, then stop and report. Past the hard limit only git commands are allowed."),
+    "research": ("Context check: your context is {k}k tokens, over the {cap}k cap for a research run. At the next "
+                 "safe point bring your notes file up to date so a fresh successor can continue: what is proved, "
+                 "refuted or measured, what you were midway through, what failed, the next steps. Commit it, then "
+                 "stop and report. Past the hard limit only git commands are allowed."),
     "worker": "Context check: your context is {k}k tokens, over the {cap}k cap for a light helper. Report what you have and stop.",
     "other": ("Context check: your context is {k}k tokens, over the {cap}k cap. Wrap up: return your conclusions "
               "now, briefly, rather than continuing to read."),
@@ -196,7 +209,7 @@ def pre_tool(data: dict) -> int:
     tokens = latest_context_tokens(path)
     if tokens is None:
         return 0
-    k, hard = tokens // 1000, int(cap * HARD_FACTOR)
+    k, hard = tokens // 1000, int(cap * HARD_FACTORS.get(kind, HARD_FACTOR))
     if k < hard:
         return 0
     if git_only(command_text(data.get("tool_input") or {})):

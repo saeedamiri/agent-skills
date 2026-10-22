@@ -28,10 +28,16 @@ Markdown body), so any tool that reads skills can use them as they are.
 | `coder-strong`, `verifier-strong` | strong | opus, high | gpt-6-astra, high |
 | `coder-standard`, `verifier-standard` | standard | sonnet, high | gpt-6.1-sol, high |
 | `worker-light` | light | haiku | gpt-6-luna, low |
+| `trial-sonnet` | trial | sonnet, high | - |
+| `research-fable`, `research-opus`, `research-sonnet` | research | fable / opus / sonnet, high | - |
 
 The router picks the tier per dispatch, standard first, and escalates to strong
 when a round fails for lack of depth. Full-lane verification is always strong.
 Change a model here, not in the skills.
+
+Trial and research agents are outside the package cycle: `trial-sonnet` takes a benchmark
+task as a test taker; the research agents work an open research question. Both have a 400k
+context cap (450k hard limit) and keep a notes file for a successor.
 
 ## Install
 
