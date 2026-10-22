@@ -30,6 +30,8 @@ vars in thousands of tokens, e.g. CONTEXT_CAP_CODER=250:
                    hard limit 450k (HARD_FACTORS)
   research-* 400k  long research run: update and commit the notes file for a successor, stop;
                    hard limit 450k
+  advanced-research-*
+             500k  as research-*, at max effort; hard limit 550k
   (other subagent) 200k
   main session     notes only when AGENT_ROLE=router (set by the router launcher settings),
                    at CONTEXT_CAP_MAIN (default 180k); never blocked. Other main sessions,
@@ -52,12 +54,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-CAPS = {"coder": 250, "verifier": 200, "worker": 100, "trial": 400, "research": 400}
+CAPS = {"coder": 250, "verifier": 200, "worker": 100, "trial": 400, "research": 400,
+        "advanced-research": 500}
 OTHER_SUBAGENT = 200
 MAIN = 180
 REMIND_STEP = 40  # thousand tokens between reminders
 HARD_FACTOR = 1.2
-HARD_FACTORS = {"trial": 1.125, "research": 1.125}  # 400k cap -> 450k hard limit
+HARD_FACTORS = {"trial": 1.125, "research": 1.125,  # 400k cap -> 450k hard limit
+                "advanced-research": 1.1}  # 500k cap -> 550k hard limit
 ALLOWED_GIT = ("status", "diff", "log", "show", "add", "commit", "worktree list", "rev-parse", "branch --show-current")
 HARD_MESSAGE = ("Hard context limit: your context is {k}k tokens, past the hard limit of {hard}k ({cap}k cap). Further "
                 "work is refused. Only git status/diff/log/show/add/commit are allowed. Commit what you have now (WIP is "
@@ -79,6 +83,11 @@ MESSAGES = {
                  "safe point bring your notes file up to date so a fresh successor can continue: what is proved, "
                  "refuted or measured, what you were midway through, what failed, the next steps. Commit it, then "
                  "stop and report. Past the hard limit only git commands are allowed."),
+    "advanced-research": ("Context check: your context is {k}k tokens, over the {cap}k cap for an advanced research "
+                          "run. At the next safe point bring your notes file up to date so a fresh successor can "
+                          "continue: what is proved, refuted or measured, what you were midway through, what failed, "
+                          "the next steps. Commit it, then stop and report. Past the hard limit only git commands are "
+                          "allowed."),
     "worker": "Context check: your context is {k}k tokens, over the {cap}k cap for a light helper. Report what you have and stop.",
     "other": ("Context check: your context is {k}k tokens, over the {cap}k cap. Wrap up: return your conclusions "
               "now, briefly, rather than continuing to read."),

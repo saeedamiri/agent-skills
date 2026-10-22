@@ -31,6 +31,7 @@ Markdown body), so any tool that reads skills can use them as they are.
 | `trial-sonnet` | trial | sonnet, high | - |
 | `research-fable`, `research-opus`, `research-sonnet` | research | fable / opus / sonnet, high | - |
 | `research-astra`, `research-sol` | research | - | gpt-6-astra / gpt-6.1-sol, ultra |
+| `advanced-research-fable`, `advanced-research-opus`, `advanced-research-sonnet` | advanced research | fable / opus / sonnet, max | - |
 
 The router picks the tier per dispatch, standard first, and escalates to strong
 when a round fails for lack of depth. Full-lane verification is always strong.
@@ -38,7 +39,9 @@ Change a model here, not in the skills.
 
 Trial and research agents are outside the package cycle: `trial-sonnet` takes a benchmark
 task as a test taker; the research agents work an open research question. Both have a 400k
-context cap (450k hard limit) and keep a notes file for a successor.
+context cap (450k hard limit) and keep a notes file for a successor. The advanced research
+agents are the same at max effort with a 500k cap (550k hard limit), for questions a research
+run did not crack; they cost far more per run.
 
 ## Install
 
