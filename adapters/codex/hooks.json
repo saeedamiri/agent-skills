@@ -3,6 +3,9 @@
     "PreToolUse": [
       { "matcher": "*", "hooks": [ { "type": "command", "command": "\"{PYTHON}\" \"{HOOK}\"", "timeout": 10 } ] }
     ],
+    "SessionStart": [
+      { "matcher": "^compact$", "hooks": [ { "type": "command", "command": "\"{PYTHON}\" \"{HOOK}\"", "timeout": 10 } ] }
+    ],
     "PostToolUse": [
       { "matcher": "*", "hooks": [ { "type": "command", "command": "\"{PYTHON}\" \"{HOOK}\"", "timeout": 10 } ] }
     ]

@@ -1,4 +1,4 @@
-"""Install the cycle skills, worker roles, context-cap hook and `router` command.
+"""Install the cycle skills, worker roles, context-cap hook and router commands.
 
     python install.py                       # detect the OS and the installed tools, install everything
     python install.py check                 # what is installed where
@@ -45,7 +45,9 @@ def same(a: Path, b: Path) -> bool:
 
 
 def fill(text: str) -> str:
-    return text.replace("{HOOK}", HOOK).replace("{PYTHON}", PYTHON)
+    return (text.replace("{HOOK}", HOOK).replace("{PYTHON}", PYTHON)
+            .replace("{ROUTER_SKILL}", (ROOT / "cycle-router" / "SKILL.md").as_posix())
+            .replace("{ROUTER_REFERENCE}", (ROOT / "cycle-router" / "reference.md").as_posix()))
 
 
 def link_dir(src: Path, dst: Path) -> None:
@@ -76,20 +78,33 @@ def merge_hooks(target: Path, template: Path) -> None:
     wanted = json.loads(fill(template.read_text(encoding="utf-8")))
     if target.exists():
         text = target.read_text(encoding="utf-8")
-        if HOOK in text:
-            print(f"  ok   {target} (hook registered)")
-            return
         try:
             data = json.loads(text or "{}")
         except ValueError:
             print(f"  SKIP {target} is not valid JSON; add the hooks from {template} by hand")
             return
-        shutil.copyfile(target, target.with_name(target.name + ".bak-agent-skills"))
     else:
         data = {}
     hooks = data.setdefault("hooks", {})
+    changed = False
     for event, groups in wanted["hooks"].items():
-        hooks.setdefault(event, []).extend(groups)
+        existing = hooks.setdefault(event, [])
+        for group in groups:
+            # Preserve already trusted commands, including a different Python path.
+            matcher = group.get("matcher", "").strip("^$")
+            registered = any(
+                old.get("matcher", "").strip("^$") == matcher
+                and any(HOOK in h.get("command", "") for h in old.get("hooks", []))
+                for old in existing
+            )
+            if not registered:
+                existing.append(group)
+                changed = True
+    if not changed:
+        print(f"  ok   {target} (hooks registered)")
+        return
+    if target.exists():
+        shutil.copyfile(target, target.with_name(target.name + ".bak-agent-skills"))
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"  merged hook into {target}" + (" (backup beside it)" if target.with_name(target.name + ".bak-agent-skills").exists() else ""))
@@ -140,11 +155,19 @@ def codex() -> None:
         copy_new(f, base / "agents" / f.name)
     merge_hooks(base / "hooks.json", ROOT / "adapters" / "codex" / "hooks.json")
     add_snippet(base / "AGENTS.md")
-    print("  TODO once: in Codex run /hooks and trust the context-cap hook (again after editing it)")
+    profile = base / "gpt.config.toml"
+    if profile.exists():
+        print(f"  ok   {profile} (existing profile and hook trust left alone)")
+    else:
+        profile.parent.mkdir(parents=True, exist_ok=True)
+        profile.write_text(fill((ROOT / "adapters" / "codex" / profile.name).read_text(encoding="utf-8")), encoding="utf-8")
+        print(f"  wrote {profile}")
+    router_path()
+    print("  TODO once: start gpt, run /hooks and trust the context-cap hooks (again after editing them)")
 
 
 def router_path() -> None:
-    print(f"router command ({OS})")
+    print(f"router commands ({OS})")
     if OS == "windows":
         import winreg
         import ctypes
@@ -160,10 +183,11 @@ def router_path() -> None:
             winreg.SetValueEx(key, "Path", 0, kind, ";".join(parts + [str(BIN)]))
         # tell running programs the environment changed
         ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x1A, 0, "Environment", 2, 5000, ctypes.byref(ctypes.c_ulong()))
-        print(f"  added {BIN} to your user PATH; open a new terminal, then type `router`")
+        print(f"  added {BIN} to your user PATH; open a new terminal, then type `router` or `gpt`")
         return
-    script = BIN / "router"
-    script.chmod(script.stat().st_mode | 0o111)
+    for name in ("router", "gpt"):
+        script = BIN / name
+        script.chmod(script.stat().st_mode | 0o111)
     shell = Path(os.environ.get("SHELL", "")).name
     rc_files = {
         "zsh": [HOME / ".zshrc"],
@@ -181,7 +205,7 @@ def router_path() -> None:
         rc.parent.mkdir(parents=True, exist_ok=True)
         rc.write_text(text + ("\n" if text and not text.endswith("\n") else "") + f"{PATH_MARK}\n{line}\n", encoding="utf-8")
         print(f"  added {BIN} to PATH in {rc}")
-    print("  open a new terminal, then type `router`")
+    print("  open a new terminal, then type `router` or `gpt`")
 
 
 def skills_dir(target: str) -> None:
@@ -220,6 +244,12 @@ def check() -> None:
         print(f"  {'linked ' if same(src, dst) else ('other  ' if dst.exists() else 'missing')} {dst}")
     for f in (HOME / ".claude" / "settings.json", Path(os.environ.get("CODEX_HOME", HOME / ".codex")) / "hooks.json"):
         print(f"  {'hook   ' if f.exists() and HOOK in f.read_text(encoding='utf-8') else 'no hook'} {f}")
+    base = Path(os.environ.get("CODEX_HOME", HOME / ".codex"))
+    profile = base / "gpt.config.toml"
+    print(f"  {'profile' if profile.exists() else 'missing'} {profile}")
+    for src in sorted((ROOT / "adapters" / "codex" / "agents").glob("*.toml")):
+        target = base / "agents" / src.name
+        print(f"  {'role   ' if target.exists() else 'missing'} {target}")
     on_path = any(same(Path(p), BIN) for p in os.environ.get("PATH", "").split(os.pathsep) if p)
     print(f"  {'on PATH' if on_path else 'not on PATH (yet; new terminals pick it up)'} {BIN}")
 

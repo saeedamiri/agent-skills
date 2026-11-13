@@ -17,6 +17,7 @@ these.
 | `adapters/instructions.snippet.md` | The lines to add to a harness's global instructions file. |
 | `install.py` | Links the skills into each harness and installs the adapters without overwriting anything. |
 | `bin/router`, `router.cmd`, `router.ps1` | The `router` command: a router session with its own compaction point and notes. |
+| `bin/gpt`, `gpt.cmd`, `gpt.ps1` | The `gpt` command: a Codex router with automatic approval review, router instructions and context hooks. |
 
 Skills use the open `SKILL.md` format (`name` and `description` frontmatter,
 Markdown body), so any tool that reads skills can use them as they are.
@@ -32,6 +33,7 @@ Markdown body), so any tool that reads skills can use them as they are.
 | `research-fable`, `research-opus`, `research-sonnet` | research | fable / opus / sonnet, high | - |
 | `research-astra`, `research-sol` | research | - | gpt-6-astra / gpt-6.1-sol, ultra |
 | `advanced-research-fable`, `advanced-research-opus`, `advanced-research-sonnet` | advanced research | fable / opus / sonnet, max | - |
+| `advanced-research-astra`, `advanced-research-sol` | advanced research | - | gpt-6-astra / gpt-6.1-sol, ultra |
 
 The router picks the tier per dispatch, standard first, and escalates to strong
 when a round fails for lack of depth. Full-lane verification is always strong.
@@ -40,8 +42,10 @@ Change a model here, not in the skills.
 Trial and research agents are outside the package cycle: `trial-sonnet` takes a benchmark
 task as a test taker; the research agents work an open research question. Both have a 400k
 context cap (450k hard limit) and keep a notes file for a successor. The advanced research
-agents are the same at max effort with a 500k cap (550k hard limit), for questions a research
-run did not crack; they cost far more per run.
+agents use max effort in Claude Code and ultra in Codex, with a 500k cap (550k hard
+limit), for questions a research run did not crack; they cost far more per run.
+These are policy caps, not extra model capacity. The selected model's actual
+context window and automatic compaction may be smaller.
 
 ## Install
 
@@ -56,7 +60,7 @@ The installer detects the OS and which of Claude Code and Codex are installed,
 then for each one links the skills, installs the worker roles, merges the
 context-cap hook into its settings (with a backup beside the file), adds the
 cycle instructions to its global instructions file, and puts `bin/` on your
-PATH so `router` works in a new terminal (Windows: user PATH; macOS and Linux:
+PATH so `router` and `gpt` work in a new terminal (Windows: user PATH; macOS and Linux:
 your bash, zsh or fish profile). Running it again changes nothing.
 
 ```bash
@@ -67,7 +71,48 @@ python install.py skills-dir <DIR>  # any other tool that reads <DIR>/<name>/SKI
 
 Skills are linked (a directory junction on Windows, a symlink elsewhere), so an
 edit here reaches every tool at once. Codex runs a hook only after you trust
-it: run `/hooks` in Codex once, and again after editing the hook.
+it: start `gpt` and run `/hooks` once to review and trust the context-cap hooks,
+and again after changing their definitions. Trust is saved; `gpt` does not
+bypass hook trust. The installer preserves existing profiles and trust settings.
+
+## Codex router: `gpt`
+
+Type `gpt` instead of `codex` in PowerShell, Command Prompt, or a POSIX shell:
+
+```powershell
+gpt
+gpt "Route the next dispatchable package in this repository."
+gpt resume
+gpt resume <session-id>
+```
+
+The command loads `~/.codex/gpt.config.toml` (or `$CODEX_HOME/gpt.config.toml`),
+which assigns the router role and tells it to read the cycle-router skill and
+the repository's router instructions before dispatching. It starts with
+**Workspace (Approve for me)** permissions: sandbox escalation requests go to
+automatic review. This does not grant push, merge or deployment authority.
+
+Only this launch sets `AGENT_ROLE=router` and `CONTEXT_CAP_MAIN=185`, enables
+hooks, and requests automatic compaction at 202k tokens. The hook reminds the
+router to save its one-page state at 185k, then to re-read it and reconcile from
+git after compaction, before the next model request. The command uses
+`--no-daemon` so the session and its hooks inherit the router environment.
+Normal `codex` sessions keep their existing settings; the Claude Code `router`
+command is unchanged. Arguments pass through, including resume options.
+
+The installer registers the tool hooks and the `SessionStart` compaction hook,
+including when upgrading an installation that already has the tool hooks.
+It also installs the coder, verifier, light worker, regular research and senior
+research roles. The senior roles are `advanced-research-astra` and
+`advanced-research-sol`. Worker caps remain backstops if the router's earlier
+compaction threshold is inherited by its workers.
+
+Use a Codex CLI version supporting `--approve-for-me`, `--no-daemon`, profile
+files and the documented hook events (tested with 0.167.0). To install just
+this adapter and put the commands on your PATH, run `python install.py codex`.
+The installer leaves an existing `gpt.config.toml` alone; edit it directly
+when you want to change your router defaults. Hook trust persists with the
+selected profile.
 
 ## Router sessions compact on their own (Claude Code)
 
