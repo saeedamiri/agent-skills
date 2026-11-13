@@ -76,6 +76,9 @@ def copy_new(src: Path, dst: Path) -> None:
 
 def refresh_router_profile(target: Path) -> None:
     """Enable child-owned context defaults in an existing router profile."""
+    # REVIEW [P1]: Regex edits corrupt valid TOML and miss explicit preferences;
+    # multiline values are modified and invalid input is written without validation.
+    # Reproduce: python -m unittest -q test_profile_upgrade
     original = target.read_bytes()
     try:
         text = original.decode("utf-8")
