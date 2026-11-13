@@ -133,6 +133,11 @@ profile if the setting is absent. It saves the exact prior bytes beside the
 profile and leaves other settings and hook trust intact. An explicit `false`
 is left alone and reported. The change applies to newly started router and
 worker sessions; running sessions retain the configuration they started with.
+Upgrading an existing profile requires Python 3.11+ for TOML validation;
+Python 3.9 and 3.10 leave it untouched and report that requirement. Invalid
+TOML or a non-table `features` value is also reported and left untouched.
+Quoted keys, dotted keys and inline feature tables are supported. Each edit
+must parse and change only the missing setting before any file is written.
 
 ## Router sessions compact on their own (Claude Code)
 

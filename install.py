@@ -18,13 +18,18 @@ missing child context setting, with a backup; explicit preferences are kept.
 from __future__ import annotations
 
 import json
+import math
 import os
 import platform
-import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:  # Fresh installs still support Python 3.9 and 3.10.
+    tomllib = None
 
 ROOT = Path(__file__).resolve().parent
 HOME = Path.home()
@@ -74,34 +79,124 @@ def copy_new(src: Path, dst: Path) -> None:
     print(f"  copy {dst}")
 
 
+def profile_edit_points(text: str):
+    """Yield root table headers and inline tables, outside strings/comments."""
+    position = 0
+    depth = 0
+    root = True
+    while position < len(text):
+        char = text[position]
+        if char == "#":
+            end = text.find("\n", position)
+            position = len(text) if end < 0 else end + 1
+            continue
+        if char in "\"'":
+            multiline = text.startswith(char * 3, position)
+            position += 3 if multiline else 1
+            while position < len(text):
+                if char == '"' and text[position] == "\\":
+                    position += 2
+                elif text.startswith(char * (3 if multiline else 1), position):
+                    position += 3 if multiline else 1
+                    if multiline:
+                        # Four/five closing quotes include one/two value quotes.
+                        while position < len(text) and text[position] == char:
+                            position += 1
+                    break
+                else:
+                    position += 1
+            continue
+        if char == "[" and depth == 0:
+            start = text.rfind("\n", 0, position) + 1
+            if not text[start:position].strip():
+                end = text.find("\n", position)
+                end = len(text) if end < 0 else end + 1
+                yield "header", start, end
+                root = False
+                position = end
+                continue
+        if char == "{" and depth == 0 and root:
+            start = text.rfind("\n", 0, position) + 1
+            yield "inline", start, position + 1
+        if char in "[{":
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+        position += 1
+
+
+def same_toml(left, right) -> bool:
+    """Compare parsed values including TOML's non-reflexive NaN floats."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(same_toml(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(same_toml(a, b) for a, b in zip(left, right))
+    return left == right or (isinstance(left, float) and math.isnan(left) and math.isnan(right))
+
+
 def refresh_router_profile(target: Path) -> None:
     """Enable child-owned context defaults in an existing router profile."""
     # REVIEW [P1]: Regex edits corrupt valid TOML and miss explicit preferences;
     # multiline values are modified and invalid input is written without validation.
     # Reproduce: python -m unittest -q test_profile_upgrade
+    if tomllib is None:
+        print(f"  SKIP {target} (existing profile upgrade requires Python 3.11+; left alone)")
+        return
     original = target.read_bytes()
     try:
         text = original.decode("utf-8")
     except UnicodeDecodeError:
         print(f"  SKIP {target} (not UTF-8; left alone)")
         return
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        print(f"  SKIP {target} (invalid TOML; left alone)")
+        return
+    features = data.get("features", {})
+    if not isinstance(features, dict):
+        print(f"  SKIP {target} (features is not a table; left alone)")
+        return
+    key = "subagent_default_context_limits"
+    if key in features:
+        if features[key] is True:
+            print(f"  ok   {target} (child context defaults enabled)")
+        else:
+            print(f"  DIFF {target} (child context defaults explicitly set; left alone)")
+        return
+
     newline = "\r\n" if "\r\n" in text else "\n"
-    section = re.search(r"(?m)^[ \t]*\[features\][ \t]*(?:#.*)?(?:\r?\n|$)", text)
-    if section:
-        end_match = re.search(r"(?m)^[ \t]*\[", text[section.end():])
-        end = section.end() + end_match.start() if end_match else len(text)
-        body = text[section.end():end]
-        setting = re.search(r"(?m)^[ \t]*subagent_default_context_limits[ \t]*=[ \t]*([^#\r\n]+)", body)
-        if setting:
-            if setting.group(1).strip() == "true":
-                print(f"  ok   {target} (child context defaults enabled)")
+    setting = f"{key} = true"
+    edits = []
+    for kind, start, end in profile_edit_points(text):
+        fragment = text[start:end] + ("}" if kind == "inline" else "")
+        try:
+            table = tomllib.loads(fragment)
+        except tomllib.TOMLDecodeError:
+            continue
+        if table == {"features": {}}:
+            if kind == "header":
+                separator = "" if text[:end].endswith("\n") else newline
+                edits.append((end, separator + setting + newline))
             else:
-                print(f"  DIFF {target} (child context defaults explicitly set; left alone)")
-            return
-        updated = text[:section.end()] + f"subagent_default_context_limits = true{newline}" + text[section.end():]
+                edits.append((end, " " + setting + ("," if features else "")))
+    separator = "" if not text or text.endswith("\n") else newline
+    edits.extend(((len(text), separator + f"[features]{newline}{setting}{newline}"),
+                  (0, f"features.{setting}{newline}")))
+    expected = dict(data, features=dict(features, **{key: True}))
+    for position, addition in edits:
+        updated = text[:position] + addition + text[position:]
+        try:
+            result = tomllib.loads(updated)
+        except tomllib.TOMLDecodeError:
+            continue
+        if same_toml(result, expected):
+            break
     else:
-        separator = "" if not text or text.endswith(("\n", "\r")) else newline
-        updated = text + separator + f"[features]{newline}subagent_default_context_limits = true{newline}"
+        print(f"  SKIP {target} (cannot safely add child context defaults; left alone)")
+        return
     backup = target.with_name(target.name + ".bak-agent-skills")
     number = 1
     while backup.exists():
