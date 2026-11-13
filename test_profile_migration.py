@@ -102,6 +102,26 @@ class ProfileMigrationTests(unittest.TestCase):
         self.assertEqual(profile.read_bytes(), original)
         self.assertEqual(list(profile.parent.iterdir()), [profile])
 
+    def test_key_spellings_preserve_explicit_boolean_preferences(self):
+        tables = ('features', '"features"', "'features'", '"\\u0066eatures"')
+        keys = ('subagent_default_context_limits', '"subagent_default_context_limits"',
+                "'subagent_default_context_limits'", '"subagent_default_context_\\u006cimits"')
+        for table in tables:
+            for key in keys:
+                for value in ('false', 'true'):
+                    for source in (f'[{table}]\n{key} = {value}',
+                                   f'{table}.{key} = {value}',
+                                   f'{table} = {{ {key} = {value} }}'):
+                        with self.subTest(source=source):
+                            original = source.encode()
+                            self.assertIs(tomllib.loads(source)['features'][
+                                'subagent_default_context_limits'], value == 'true')
+                            profile = self.profile(original)
+                            output = self.refresh(profile)
+                            self.assertIn('explicitly set' if value == 'false' else 'enabled', output)
+                            self.assertEqual(profile.read_bytes(), original)
+                            self.assertEqual(list(profile.parent.iterdir()), [profile])
+
 
 if __name__ == '__main__':
     unittest.main()

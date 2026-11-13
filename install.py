@@ -138,9 +138,6 @@ def same_toml(left, right) -> bool:
 
 def refresh_router_profile(target: Path) -> None:
     """Enable child-owned context defaults in an existing router profile."""
-    # REVIEW [P1]: Regex edits corrupt valid TOML and miss explicit preferences;
-    # multiline values are modified and invalid input is written without validation.
-    # Reproduce: python -m unittest -q test_profile_upgrade
     if tomllib is None:
         print(f"  SKIP {target} (existing profile upgrade requires Python 3.11+; left alone)")
         return
