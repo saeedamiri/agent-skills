@@ -12,14 +12,15 @@ and bash, zsh and fish are handled). Python 3.9+, no dependencies; use
 
 Skills are linked, not copied (a directory junction on Windows, a symlink
 elsewhere), so editing this repository updates every tool at once. Existing
-files are never overwritten: settings and hook files are merged, with a backup
-beside them, and anything that conflicts is reported and left for you.
+hook settings are merged with a backup. The router profile receives only a
+missing child context setting, with a backup; explicit preferences are kept.
 """
 from __future__ import annotations
 
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -71,6 +72,41 @@ def copy_new(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, dst)
     print(f"  copy {dst}")
+
+
+def refresh_router_profile(target: Path) -> None:
+    """Enable child-owned context defaults in an existing router profile."""
+    original = target.read_bytes()
+    try:
+        text = original.decode("utf-8")
+    except UnicodeDecodeError:
+        print(f"  SKIP {target} (not UTF-8; left alone)")
+        return
+    newline = "\r\n" if "\r\n" in text else "\n"
+    section = re.search(r"(?m)^[ \t]*\[features\][ \t]*(?:#.*)?(?:\r?\n|$)", text)
+    if section:
+        end_match = re.search(r"(?m)^[ \t]*\[", text[section.end():])
+        end = section.end() + end_match.start() if end_match else len(text)
+        body = text[section.end():end]
+        setting = re.search(r"(?m)^[ \t]*subagent_default_context_limits[ \t]*=[ \t]*([^#\r\n]+)", body)
+        if setting:
+            if setting.group(1).strip() == "true":
+                print(f"  ok   {target} (child context defaults enabled)")
+            else:
+                print(f"  DIFF {target} (child context defaults explicitly set; left alone)")
+            return
+        updated = text[:section.end()] + f"subagent_default_context_limits = true{newline}" + text[section.end():]
+    else:
+        separator = "" if not text or text.endswith(("\n", "\r")) else newline
+        updated = text + separator + f"[features]{newline}subagent_default_context_limits = true{newline}"
+    backup = target.with_name(target.name + ".bak-agent-skills")
+    number = 1
+    while backup.exists():
+        backup = target.with_name(target.name + f".bak-agent-skills-{number}")
+        number += 1
+    backup.write_bytes(original)
+    target.write_bytes(updated.encode("utf-8"))
+    print(f"  updated {target} (backup: {backup})")
 
 
 def merge_hooks(target: Path, template: Path) -> None:
@@ -157,7 +193,7 @@ def codex() -> None:
     add_snippet(base / "AGENTS.md")
     profile = base / "gpt.config.toml"
     if profile.exists():
-        print(f"  ok   {profile} (existing profile and hook trust left alone)")
+        refresh_router_profile(profile)
     else:
         profile.parent.mkdir(parents=True, exist_ok=True)
         profile.write_text(fill((ROOT / "adapters" / "codex" / profile.name).read_text(encoding="utf-8")), encoding="utf-8")

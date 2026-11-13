@@ -15,7 +15,7 @@ these.
 | `adapters/claude-code/` | Worker roles as agent types (model + effort per tier) and the settings to register the hook. |
 | `adapters/codex/` | Worker roles as agent TOML files and `hooks.json`. |
 | `adapters/instructions.snippet.md` | The lines to add to a harness's global instructions file. |
-| `install.py` | Links the skills into each harness and installs the adapters without overwriting anything. |
+| `install.py` | Links the skills and installs the adapters, with scoped backed-up profile upgrades. |
 | `bin/router`, `router.cmd`, `router.ps1` | The `router` command: a router session with its own compaction point and notes. |
 | `bin/gpt`, `gpt.cmd`, `gpt.ps1` | The `gpt` command: a Codex router with automatic approval review, router instructions and context hooks. |
 
@@ -104,15 +104,35 @@ The installer registers the tool hooks and the `SessionStart` compaction hook,
 including when upgrading an installation that already has the tool hooks.
 It also installs the coder, verifier, light worker, regular research and senior
 research roles. The senior roles are `advanced-research-astra` and
-`advanced-research-sol`. Worker caps remain backstops if the router's earlier
-compaction threshold is inherited by its workers.
+`advanced-research-sol`. New router profiles enable child context defaults, so
+workers no longer inherit the router's 202k compaction setting. Each worker
+uses the selected model's native compaction point. The context-cap hook still
+enforces these separate policy limits:
 
-Use a Codex CLI version supporting `--approve-for-me`, `--no-daemon`, profile
-files and the documented hook events (tested with 0.167.0). To install just
+| Worker role | Warning | Hard stop |
+| --- | ---: | ---: |
+| `coder-*` | 250k | 300k |
+| `verifier-*` | 200k | 240k |
+| `worker-*` | 100k | 120k |
+| `research-*` | 400k | 450k |
+| `advanced-research-*` | 500k | 550k |
+| Other spawned roles | 200k | 240k |
+
+These are policy backstops, not automatic compaction thresholds. The CLI version
+used here does not apply a compaction setting from an individual role file, so
+roles sharing a model also share its native compaction point. That point may be
+below a policy warning and never increases the model's context window. A role
+without an explicit configuration also uses its selected model's default.
+
+Use a CLI version supporting `--approve-for-me`, `--no-daemon`, profile
+files, the documented hook events and `subagent_default_context_limits`
+(verified with 0.169.0). To install just
 this adapter and put the commands on your PATH, run `python install.py codex`.
-The installer leaves an existing `gpt.config.toml` alone; edit it directly
-when you want to change your router defaults. Hook trust persists with the
-selected profile.
+The installer adds the child context default setting to an existing router
+profile if the setting is absent. It saves the exact prior bytes beside the
+profile and leaves other settings and hook trust intact. An explicit `false`
+is left alone and reported. The change applies to newly started router and
+worker sessions; running sessions retain the configuration they started with.
 
 ## Router sessions compact on their own (Claude Code)
 

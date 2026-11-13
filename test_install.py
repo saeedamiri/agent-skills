@@ -45,6 +45,7 @@ class InstallerTests(unittest.TestCase):
                 content = profile.read_text(encoding='utf-8')
                 self.assertIn('approvals_reviewer = "auto_review"', content)
                 self.assertIn('model_auto_compact_token_limit = 202000', content)
+                self.assertIn('subagent_default_context_limits = true', content)
                 self.assertIn((install.ROOT / 'cycle-router' / 'SKILL.md').as_posix(), content)
                 self.assertNotIn('{ROUTER_SKILL}', content)
                 for tier in ('astra', 'sol'):
@@ -56,6 +57,49 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual(profile.read_text(encoding='utf-8'), customized)
                 self.assertEqual((base / 'hooks.json').read_bytes(), hooks)
                 self.assertEqual(path_setup.call_count, 2)
+
+    def test_upgrade_enables_child_context_defaults_without_changing_profile_trust(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            base = home / 'custom-home'
+            base.mkdir()
+            profile = base / 'gpt.config.toml'
+            old = (b'model_auto_compact_token_limit = 202000\r\n'
+                   b'[features]\r\nhooks = true\r\nmulti_agent = true\r\n'
+                   b'[hooks.state]\r\ntrusted_hash = "saved"\r\n')
+            profile.write_bytes(old)
+            with patch.object(install, 'HOME', home), patch.dict(install.os.environ, {'CODEX_HOME': str(base)}), \
+                    patch.object(install, 'link_dir'), patch.object(install, 'router_path'), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                install.codex()
+                upgraded = profile.read_bytes()
+                install.codex()
+            self.assertEqual(profile.read_bytes(), upgraded)
+            self.assertEqual(upgraded, old.replace(b'[features]\r\n',
+                                                    b'[features]\r\nsubagent_default_context_limits = true\r\n'))
+            self.assertEqual(profile.with_name('gpt.config.toml.bak-agent-skills').read_bytes(), old)
+
+    def test_explicit_child_context_preference_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory) / 'gpt.config.toml'
+            original = '[features]\nsubagent_default_context_limits = false\n'
+            profile.write_text(original, encoding='utf-8')
+            with contextlib.redirect_stdout(io.StringIO()):
+                install.refresh_router_profile(profile)
+            self.assertEqual(profile.read_text(encoding='utf-8'), original)
+            self.assertFalse(profile.with_name('gpt.config.toml.bak-agent-skills').exists())
+
+    def test_upgrade_adds_feature_section_when_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory) / 'gpt.config.toml'
+            original = 'model_auto_compact_token_limit = 202000\n'
+            profile.write_text(original, encoding='utf-8')
+            with contextlib.redirect_stdout(io.StringIO()):
+                install.refresh_router_profile(profile)
+            self.assertEqual(profile.read_text(encoding='utf-8'),
+                             original + '[features]\nsubagent_default_context_limits = true\n')
+            self.assertEqual(profile.with_name('gpt.config.toml.bak-agent-skills').read_text(encoding='utf-8'),
+                             original)
 
 
 if __name__ == '__main__':
