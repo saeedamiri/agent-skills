@@ -27,13 +27,13 @@ Markdown body), so any tool that reads skills can use them as they are.
 | Role | Tier | Claude Code | Codex |
 | --- | --- | --- | --- |
 | `coder-strong`, `verifier-strong` | strong | opus, high | gpt-6-astra, high |
-| `coder-standard`, `verifier-standard` | standard | sonnet, high | gpt-6.1-sol, high |
-| `worker-light` | light | haiku | gpt-6-luna, low |
+| `coder-standard`, `verifier-standard` | standard | sonnet, high | gpt-6-sol, high |
+| `worker-light` | light | haiku | gpt-6-luna, high |
 | `trial-sonnet` | trial | sonnet, high | - |
 | `research-fable`, `research-opus`, `research-sonnet` | research | fable / opus / sonnet, high | - |
-| `research-astra`, `research-sol` | research | - | gpt-6-astra / gpt-6.1-sol, ultra |
+| `research-astra`, `research-sol` | research | - | gpt-6-astra / gpt-6.1-sol, high |
 | `advanced-research-fable`, `advanced-research-opus`, `advanced-research-sonnet` | advanced research | fable / opus / sonnet, max | - |
-| `advanced-research-astra`, `advanced-research-sol` | advanced research | - | gpt-6-astra / gpt-6.1-sol, ultra |
+| `advanced-research-astra`, `advanced-research-sol` | advanced research | - | gpt-6-astra / gpt-6.1-sol, high |
 
 The router picks the tier per dispatch, standard first, and escalates to strong
 when a round fails for lack of depth. Full-lane verification is always strong.
@@ -42,7 +42,7 @@ Change a model here, not in the skills.
 Trial and research agents are outside the package cycle: `trial-sonnet` takes a benchmark
 task as a test taker; the research agents work an open research question. Both have a 400k
 context cap (450k hard limit) and keep a notes file for a successor. The advanced research
-agents use max effort in Claude Code and ultra in Codex, with a 500k cap (550k hard
+agents use max effort in Claude Code and high in Codex, with a 500k cap (550k hard
 limit), for questions a research run did not crack; they cost far more per run.
 These are policy caps, not extra model capacity. The selected model's actual
 context window and automatic compaction may be smaller.
