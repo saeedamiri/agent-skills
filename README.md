@@ -179,4 +179,4 @@ about 40 tool calls in a round as the cap.
 
 ## Licence
 
-MIT, copyright (c) 2026 Saeed Amiri; see `LICENSE`. Use, change and share it freely; keep the copyright notice in copies.
+MIT, copyright (c) 2026 Saeed Amiri; see [LICENSE](LICENSE). Use, change and share it freely; keep the copyright notice in copies.
