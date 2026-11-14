@@ -12,18 +12,24 @@ and bash, zsh and fish are handled). Python 3.9+, no dependencies; use
 
 Skills are linked, not copied (a directory junction on Windows, a symlink
 elsewhere), so editing this repository updates every tool at once. Existing
-files are never overwritten: settings and hook files are merged, with a backup
-beside them, and anything that conflicts is reported and left for you.
+hook settings are merged with a backup. The router profile receives only a
+missing child context setting, with a backup; explicit preferences are kept.
 """
 from __future__ import annotations
 
 import json
+import math
 import os
 import platform
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:  # Fresh installs still support Python 3.9 and 3.10.
+    tomllib = None
 
 ROOT = Path(__file__).resolve().parent
 HOME = Path.home()
@@ -71,6 +77,131 @@ def copy_new(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, dst)
     print(f"  copy {dst}")
+
+
+def profile_edit_points(text: str):
+    """Yield root table headers and inline tables, outside strings/comments."""
+    position = 0
+    depth = 0
+    root = True
+    while position < len(text):
+        char = text[position]
+        if char == "#":
+            end = text.find("\n", position)
+            position = len(text) if end < 0 else end + 1
+            continue
+        if char in "\"'":
+            multiline = text.startswith(char * 3, position)
+            position += 3 if multiline else 1
+            while position < len(text):
+                if char == '"' and text[position] == "\\":
+                    position += 2
+                elif text.startswith(char * (3 if multiline else 1), position):
+                    position += 3 if multiline else 1
+                    if multiline:
+                        # Four/five closing quotes include one/two value quotes.
+                        while position < len(text) and text[position] == char:
+                            position += 1
+                    break
+                else:
+                    position += 1
+            continue
+        if char == "[" and depth == 0:
+            start = text.rfind("\n", 0, position) + 1
+            if not text[start:position].strip():
+                end = text.find("\n", position)
+                end = len(text) if end < 0 else end + 1
+                yield "header", start, end
+                root = False
+                position = end
+                continue
+        if char == "{" and depth == 0 and root:
+            start = text.rfind("\n", 0, position) + 1
+            yield "inline", start, position + 1
+        if char in "[{":
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+        position += 1
+
+
+def same_toml(left, right) -> bool:
+    """Compare parsed values including TOML's non-reflexive NaN floats."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(same_toml(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(same_toml(a, b) for a, b in zip(left, right))
+    return left == right or (isinstance(left, float) and math.isnan(left) and math.isnan(right))
+
+
+def refresh_router_profile(target: Path) -> None:
+    """Enable child-owned context defaults in an existing router profile."""
+    if tomllib is None:
+        print(f"  SKIP {target} (existing profile upgrade requires Python 3.11+; left alone)")
+        return
+    original = target.read_bytes()
+    try:
+        text = original.decode("utf-8")
+    except UnicodeDecodeError:
+        print(f"  SKIP {target} (not UTF-8; left alone)")
+        return
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        print(f"  SKIP {target} (invalid TOML; left alone)")
+        return
+    features = data.get("features", {})
+    if not isinstance(features, dict):
+        print(f"  SKIP {target} (features is not a table; left alone)")
+        return
+    key = "subagent_default_context_limits"
+    if key in features:
+        if features[key] is True:
+            print(f"  ok   {target} (child context defaults enabled)")
+        else:
+            print(f"  DIFF {target} (child context defaults explicitly set; left alone)")
+        return
+
+    newline = "\r\n" if "\r\n" in text else "\n"
+    setting = f"{key} = true"
+    edits = []
+    for kind, start, end in profile_edit_points(text):
+        fragment = text[start:end] + ("}" if kind == "inline" else "")
+        try:
+            table = tomllib.loads(fragment)
+        except tomllib.TOMLDecodeError:
+            continue
+        if table == {"features": {}}:
+            if kind == "header":
+                separator = "" if text[:end].endswith("\n") else newline
+                edits.append((end, separator + setting + newline))
+            else:
+                edits.append((end, " " + setting + ("," if features else "")))
+    separator = "" if not text or text.endswith("\n") else newline
+    edits.extend(((len(text), separator + f"[features]{newline}{setting}{newline}"),
+                  (0, f"features.{setting}{newline}")))
+    expected = dict(data, features=dict(features, **{key: True}))
+    for position, addition in edits:
+        updated = text[:position] + addition + text[position:]
+        try:
+            result = tomllib.loads(updated)
+        except tomllib.TOMLDecodeError:
+            continue
+        if same_toml(result, expected):
+            break
+    else:
+        print(f"  SKIP {target} (cannot safely add child context defaults; left alone)")
+        return
+    backup = target.with_name(target.name + ".bak-agent-skills")
+    number = 1
+    while backup.exists():
+        backup = target.with_name(target.name + f".bak-agent-skills-{number}")
+        number += 1
+    backup.write_bytes(original)
+    target.write_bytes(updated.encode("utf-8"))
+    print(f"  updated {target} (backup: {backup})")
 
 
 def merge_hooks(target: Path, template: Path) -> None:
@@ -157,7 +288,7 @@ def codex() -> None:
     add_snippet(base / "AGENTS.md")
     profile = base / "gpt.config.toml"
     if profile.exists():
-        print(f"  ok   {profile} (existing profile and hook trust left alone)")
+        refresh_router_profile(profile)
     else:
         profile.parent.mkdir(parents=True, exist_ok=True)
         profile.write_text(fill((ROOT / "adapters" / "codex" / profile.name).read_text(encoding="utf-8")), encoding="utf-8")

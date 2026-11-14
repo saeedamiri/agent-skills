@@ -30,3 +30,4 @@ committed to git, including trailers, branch names, comments and PR text.
 [features]
 hooks = true
 multi_agent = true
+subagent_default_context_limits = true
